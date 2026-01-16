@@ -1,15 +1,22 @@
 {
-  "name": "encore-ts-starter",
+  "name": "document-management",
   "private": true,
-  "version": "0.0.1",
-  "description": "Encore Typescript Starter",
+  "version": "1.0",
+  "description": "Simple Document Management",
   "license": "MPL-2.0",
   "type": "module",
   "devDependencies": {
     "@types/node": "^20.5.7",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.8",
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "encore.dev": "^1.53.4"
+    "better-auth": "^1.4.10",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
+    "encore.dev": "^1.53.4",
+    "pg": "^8.16.3",
+    "zod": "^4.3.5"
   }
 }
