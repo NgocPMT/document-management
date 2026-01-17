@@ -8,6 +8,4 @@ const DB = new SQLDatabase("document-management", {
   },
 });
 
-const db = drizzle(DB.connectionString);
-
-export { db };
+export const db = drizzle(DB.connectionString);
