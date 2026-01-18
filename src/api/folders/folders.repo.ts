@@ -4,7 +4,7 @@ import { and, eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
 
 export type Folder = InferSelectModel<typeof folders>;
 export type FolderCreate = Omit<InferInsertModel<typeof folders>, "id">;
-export type FolderUpdate = Omit<FolderCreate, "createdAt" | "userId">;
+export type FolderUpdate = Partial<Omit<FolderCreate, "createdAt" | "userId">>;
 
 const FolderRepository = {
   find: async (userId: string) => {
