@@ -5,10 +5,10 @@ export const user = p.pgTable("user", {
   id: p.text("id").primaryKey(),
   name: p.text("name").notNull(),
   email: p.text("email").notNull().unique(),
-  emailVerified: p.boolean("emailVerified").notNull().default(false),
+  emailVerified: p.boolean("email_verified").notNull().default(false),
   image: p.text("image"),
-  createdAt: p.timestamp("createdAt").notNull().defaultNow(),
-  updatedAt: p.timestamp("updatedAt").notNull().defaultNow(),
+  createdAt: p.timestamp("created_at").notNull().defaultNow(),
+  updatedAt: p.timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -59,7 +59,7 @@ export const verification = p.pgTable("verification", {
 
 export const folders = p.pgTable("folders", {
   id: p.uuid("id").defaultRandom().primaryKey(),
-  name: p.text("name"),
+  name: p.text("name").notNull(),
   createdAt: p.timestamp("created_at").notNull().defaultNow(),
   userId: p
     .text("user_id")
@@ -73,3 +73,81 @@ export const foldersRelations = relations(folders, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const documentStatusEnum = p.pgEnum("document_status", [
+  "UPLOADING",
+  "READY",
+  "PROCESSING",
+  "FAILED",
+]);
+
+export const documents = p.pgTable("documents", {
+  id: p.uuid("id").defaultRandom().primaryKey(),
+  name: p.text("name").notNull(),
+  userId: p
+    .text("user_id")
+    .notNull()
+    .references(() => user.id),
+  folderId: p.uuid("folder_id").references(() => folders.id),
+  status: documentStatusEnum().notNull(),
+  createdAt: p.timestamp("created_at").notNull().defaultNow(),
+});
+
+export const documentsRelations = relations(documents, ({ one, many }) => ({
+  folder: one(folders, {
+    fields: [documents.folderId],
+    references: [folders.id],
+  }),
+  user: one(user, {
+    fields: [documents.userId],
+    references: [user.id],
+  }),
+  documentSummary: one(documentSummary),
+  documentShares: many(documentShares),
+}));
+
+export const documentShares = p.pgTable(
+  "document_shares",
+  {
+    documentId: p
+      .uuid("document_id")
+      .notNull()
+      .references(() => documents.id),
+    userId: p
+      .text("user_id")
+      .notNull()
+      .references(() => user.id),
+    expiresAt: p.timestamp("expires_at").notNull(),
+  },
+  (table) => [p.primaryKey({ columns: [table.documentId, table.userId] })],
+);
+
+export const documentSharesRelations = relations(documentShares, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentShares.documentId],
+    references: [documents.id],
+  }),
+  user: one(user, {
+    fields: [documentShares.userId],
+    references: [user.id],
+  }),
+}));
+
+export const documentSummary = p.pgTable("document_summary", {
+  documentId: p
+    .uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  summary: p.text().notNull(),
+  createdAt: p.timestamp().notNull().defaultNow(),
+});
+
+export const documentSummaryRelations = relations(
+  documentSummary,
+  ({ one }) => ({
+    document: one(documents, {
+      fields: [documentSummary.documentId],
+      references: [documents.id],
+    }),
+  }),
+);
