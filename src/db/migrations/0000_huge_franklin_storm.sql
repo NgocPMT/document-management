@@ -32,6 +32,7 @@ CREATE TABLE "documents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"user_id" text NOT NULL,
+	"sizeBytes" integer NOT NULL,
 	"folder_id" uuid,
 	"status" "document_status" NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL

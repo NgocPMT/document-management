@@ -1,14 +1,17 @@
-import { api } from "encore.dev/api";
+import { api, APIError } from "encore.dev/api";
 import busboy from "busboy";
 import log from "encore.dev/log";
 import { getAuthData } from "~encore/auth";
 import DocumentService from "./documents.service";
+import { DocumentUpdateDTO } from "./documents.interface";
+import { DocumentUpdateSchema } from "./documents.schema";
 
 // List documents (with filters, pagination)
 export const read = api(
   { expose: true, auth: true, method: "POST", path: "/v1/documents" },
   async () => {
-    //todo
+    const authData = getAuthData();
+    return DocumentService.readByUser(authData.userID);
   },
 );
 
@@ -16,7 +19,8 @@ export const read = api(
 export const readOne = api(
   { expose: true, auth: true, method: "GET", path: "/v1/documents/:id" },
   async ({ id }: { id: string }) => {
-    //todo
+    const authData = getAuthData();
+    return DocumentService.readOne(id, authData.userID);
   },
 );
 
@@ -56,11 +60,11 @@ export const upload = api.raw(
 
     bb.on("close", async () => {
       try {
-        const buf = Buffer.concat(entry.data);
+        const buffer = Buffer.concat(entry.data);
 
         await DocumentService.upload({
           filename: entry.filename,
-          buf,
+          buffer,
           mimeType: entry.mimeType,
           userId: authData.userID,
         });
@@ -71,7 +75,7 @@ export const upload = api.raw(
           JSON.stringify({
             message: "Upload completed",
             filename: entry.filename,
-            size: `${buf.length} bytes`,
+            size: `${buffer.length} bytes`,
           }),
         );
       } catch (err) {
@@ -130,8 +134,17 @@ export const download = api.raw(
 // Update document metadata
 export const update = api(
   { expose: true, auth: true, method: "PUT", path: "/v1/documents/:id" },
-  async ({ id }: { id: string }) => {
-    //todo
+  async ({ id, body }: { id: string; body: DocumentUpdateDTO }) => {
+    const result = DocumentUpdateSchema.safeParse(body);
+    if (!result.success) {
+      throw APIError.invalidArgument(
+        `Invalid update data: \n${result.error.message}`,
+      );
+    }
+
+    const authData = getAuthData();
+
+    return DocumentService.update(id, result.data, authData.userID);
   },
 );
 
@@ -139,7 +152,8 @@ export const update = api(
 export const destroy = api(
   { expose: true, auth: true, method: "DELETE", path: "/v1/documents/:id" },
   async ({ id }: { id: string }) => {
-    //todo
+    const authData = getAuthData();
+    return DocumentService.delete(id, authData.userID);
   },
 );
 
