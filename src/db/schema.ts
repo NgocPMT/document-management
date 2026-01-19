@@ -84,11 +84,12 @@ export const documentStatusEnum = p.pgEnum("document_status", [
 export const documents = p.pgTable("documents", {
   id: p.uuid("id").defaultRandom().primaryKey(),
   name: p.text("name").notNull(),
+  storageKey: p.text("storage_key").notNull(),
   userId: p
     .text("user_id")
     .notNull()
     .references(() => user.id),
-  sizeBytes: p.integer().notNull(),
+  sizeBytes: p.integer("size_bytes").notNull(),
   folderId: p.uuid("folder_id").references(() => folders.id),
   status: documentStatusEnum().notNull(),
   createdAt: p.timestamp("created_at").notNull().defaultNow(),

@@ -49,7 +49,7 @@ const DocumentRepository = {
   getObjectKey: async (id: string) => {
     const [document] = await db
       .select({
-        key: documents.name,
+        key: documents.storageKey,
       })
       .from(documents)
       .where(eq(documents.id, id))

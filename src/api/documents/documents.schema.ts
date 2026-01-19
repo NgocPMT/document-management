@@ -3,6 +3,7 @@ import { documentStatusEnum } from "../../db/schema";
 
 export const DocumentCreateSchema = z.object({
   name: z.string(),
+  key: z.string(),
   userId: z.string(),
   sizeBytes: z.int().positive(),
   folderId: z.string().optional(),

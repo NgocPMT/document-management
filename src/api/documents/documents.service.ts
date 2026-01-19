@@ -9,8 +9,28 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { APIError } from "encore.dev/api";
 import { DocumentUpdateDTO } from "./documents.schema";
 import { secret } from "encore.dev/config";
+import { fileTypeFromBuffer } from "file-type";
 
 const bucketName = secret("AWS_BUCKET_NAME");
+const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
+const ALLOWED_MIME_TYPE = [
+  "application/pdf",
+
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+
+  "text/plain",
+  "text/csv",
+
+  "image/png",
+  "image/jpeg",
+];
 
 const DocumentService = {
   readByUser: async (userId: string) => {
@@ -44,7 +64,7 @@ const DocumentService = {
 
     const command = new DeleteObjectCommand({
       Bucket: bucketName(),
-      Key: document.name,
+      Key: document.storageKey,
     });
     await s3.send(command);
 
@@ -65,9 +85,20 @@ const DocumentService = {
     mimeType: string;
     userId: string;
   }) => {
+    const type = await fileTypeFromBuffer(new Uint8Array(buffer));
+
+    if (!type || !ALLOWED_MIME_TYPE.includes(type.mime)) {
+      throw APIError.invalidArgument("Invalid or spoofed file type");
+    }
+
+    if (buffer.length > MAX_SIZE) {
+      throw APIError.invalidArgument("File is too big (50MB max)");
+    }
+
+    const randomKey = crypto.randomUUID();
     const command = new PutObjectCommand({
       Bucket: bucketName(),
-      Key: filename,
+      Key: randomKey,
       Body: buffer,
       ContentType: mimeType,
     });
@@ -75,6 +106,7 @@ const DocumentService = {
 
     const createdDocument = await DocumentRepository.create({
       name: filename,
+      storageKey: randomKey,
       userId: userId,
       status: "READY",
       sizeBytes: buffer.length,
