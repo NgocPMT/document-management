@@ -2,9 +2,16 @@ import got, { HTTPError, RequestError } from "got";
 import { ConvertResponse } from "./pdf-conversion.interface";
 import FormData from "form-data";
 import { secret } from "encore.dev/config";
+import PQueue from "p-queue";
 
 const sharpApisApplicationId = secret("SHARPAPIS_APPLICATION_ID");
 const sharpApisSecretKey = secret("SHARPAPIS_SECRET_KEY");
+
+const docConversionQueue = new PQueue({
+  concurrency: 2, // max 2 active request
+  intervalCap: 10, // max 10 requests
+  interval: 60_000, // per minute
+});
 
 export const generatePDFDownloadURL = async ({
   buffer,
@@ -41,23 +48,25 @@ export const generatePDFDownloadURL = async ({
     },
   };
 
-  try {
-    const res = await got.post(url, options).json<ConvertResponse>();
-    return res.fileDownloadUrl;
-  } catch (error) {
-    if (error instanceof HTTPError) {
-      const statusCode = error.response.statusCode;
-      const body = error.response.body;
+  return docConversionQueue.add(async () => {
+    try {
+      const res = await got.post(url, options).json<ConvertResponse>();
+      return res.fileDownloadUrl;
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const statusCode = error.response.statusCode;
+        const body = error.response.body;
 
-      throw new Error(`HTTP ${statusCode}: ${body}`);
+        throw new Error(`HTTP ${statusCode}: ${body}`);
+      }
+
+      if (error instanceof RequestError) {
+        throw new Error(`Request failed: ${error.message}`);
+      }
+
+      throw error;
     }
-
-    if (error instanceof RequestError) {
-      throw new Error(`Request failed: ${error.message}`);
-    }
-
-    throw error;
-  }
+  });
 };
 
 export const downloadPDFUrl = async (url: string): Promise<Buffer> => {
@@ -74,21 +83,23 @@ export const downloadPDFUrl = async (url: string): Promise<Buffer> => {
     },
   };
 
-  try {
-    const res = await got.get(url, options);
-    return res.rawBody;
-  } catch (error) {
-    if (error instanceof HTTPError) {
-      const statusCode = error.response.statusCode;
-      const body = error.response.body;
+  return docConversionQueue.add(async () => {
+    try {
+      const res = await got.get(url, options);
+      return res.rawBody;
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        const statusCode = error.response.statusCode;
+        const body = error.response.body;
 
-      throw new Error(`HTTP ${statusCode}: ${body}`);
+        throw new Error(`HTTP ${statusCode}: ${body}`);
+      }
+
+      if (error instanceof RequestError) {
+        throw new Error(`Request failed: ${error.message}`);
+      }
+
+      throw error;
     }
-
-    if (error instanceof RequestError) {
-      throw new Error(`Request failed: ${error.message}`);
-    }
-
-    throw error;
-  }
+  });
 };

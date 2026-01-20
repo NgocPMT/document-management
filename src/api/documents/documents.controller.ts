@@ -5,6 +5,14 @@ import { getAuthData } from "~encore/auth";
 import DocumentService from "./documents.service";
 import { DocumentUpdateDTO } from "./documents.interface";
 import { DocumentUpdateSchema } from "./documents.schema";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+
+const rateLimitingOptions = {
+  points: 2,
+  duration: 5, // Per second
+};
+
+const rateLimiter = new RateLimiterMemory(rateLimitingOptions);
 
 // List documents (with filters, pagination)
 export const read = api(
@@ -37,59 +45,85 @@ export const upload = api.raw(
   },
   async (req, res) => {
     const authData = getAuthData();
-    const bb = busboy({
-      headers: req.headers,
-      limits: { files: 1 },
-    });
-    const entry: FileEntry = { filename: "", data: [], mimeType: "" };
 
-    bb.on("file", (_, file, info) => {
-      entry.mimeType = info.mimeType;
-      entry.filename = info.filename;
-      file
-        .on("data", (data) => {
-          entry.data.push(data);
-        })
-        .on("close", () => {
-          log.info(`File ${entry.filename} uploaded`);
-        })
-        .on("error", (err) => {
-          bb.emit("error", err);
+    // Avoid abuse per userId (2 request per 1 second)
+    await rateLimiter
+      .consume(authData.userID, 1)
+      .then(() => {
+        const bb = busboy({
+          headers: req.headers,
+          limits: { files: 1 },
         });
-    });
+        const entry: FileEntry = { filename: "", data: [], mimeType: "" };
 
-    bb.on("close", async () => {
-      try {
-        const buffer = Buffer.concat(entry.data);
-
-        const createdDocument = await DocumentService.upload({
-          filename: entry.filename,
-          buffer,
-          mimeType: entry.mimeType,
-          userId: authData.userID,
+        bb.on("file", (_, file, info) => {
+          entry.mimeType = info.mimeType;
+          entry.filename = info.filename;
+          file
+            .on("data", (data) => {
+              entry.data.push(data);
+            })
+            .on("close", () => {
+              log.info(`File ${entry.filename} uploaded`);
+            })
+            .on("error", (err) => {
+              bb.emit("error", err);
+            });
         });
 
-        res.statusCode = 200;
-        res.setHeader("Content-type", "application/json");
-        res.end(
-          JSON.stringify({
-            message: "Upload completed",
-            filename: createdDocument.name,
-            size: `${createdDocument.sizeBytes} bytes`,
-          }),
-        );
-      } catch (err) {
-        bb.emit("error", err);
-      }
-    });
+        bb.on("close", async () => {
+          try {
+            const buffer = Buffer.concat(entry.data);
 
-    bb.on("error", async (err) => {
-      res.writeHead(500, { Connection: "close" });
-      res.end(`Error: ${(err as Error).message}`);
-    });
+            const createdDocument = await DocumentService.upload({
+              filename: entry.filename,
+              buffer,
+              mimeType: entry.mimeType,
+              userId: authData.userID,
+            });
 
-    req.pipe(bb);
-    return;
+            res.statusCode = 200;
+            res.setHeader("Content-type", "application/json");
+            res.end(
+              JSON.stringify({
+                message: "Upload completed",
+                filename: createdDocument.name,
+                size: `${createdDocument.sizeBytes} bytes`,
+              }),
+            );
+          } catch (err) {
+            bb.emit("error", err);
+          }
+        });
+
+        bb.on("error", async (err) => {
+          res.writeHead(500, { Connection: "close" });
+          res.end(`Error: ${(err as Error).message}`);
+        });
+
+        req.pipe(bb);
+        return;
+      })
+      .catch((rateLimiterRes) => {
+        const nextRateLimitReset = rateLimiterRes.msBeforeNext / 1000;
+        // Rate limiting information
+        const headers = {
+          "Retry-After": nextRateLimitReset,
+          "X-RateLimit-Limit": rateLimitingOptions.points,
+          "X-RateLimit-Remaining": rateLimiterRes.remainingPoints,
+          "X-RateLimit-Reset": Math.ceil(
+            (Date.now() + rateLimiterRes.msBeforeNext) / 1000,
+          ),
+        };
+
+        for (const [key, value] of Object.entries(headers)) {
+          res.setHeader(key, value);
+        }
+
+        res.writeHead(429, "Too Many Request");
+        res.end(`Too Many Request, Retry after ${nextRateLimitReset} seconds`);
+        return;
+      });
   },
 );
 
