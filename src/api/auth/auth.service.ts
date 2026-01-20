@@ -52,8 +52,6 @@ const AuthService = {
 
       return {
         userID: user.id,
-        email: user.email,
-        name: user.name,
       };
     } catch (error) {
       throw APIError.unauthenticated("Invalid token", error as Error);

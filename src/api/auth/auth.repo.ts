@@ -30,8 +30,6 @@ const AuthRepository = {
     const userRows = await db
       .select({
         id: user.id,
-        email: user.email,
-        name: user.name,
       })
       .from(user)
       .where(eq(user.id, id))

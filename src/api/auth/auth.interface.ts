@@ -6,8 +6,6 @@ export interface AuthParams {
 
 export interface AuthData {
   userID: string;
-  email: string;
-  name: string;
 }
 
 export interface SignUpDTO {
