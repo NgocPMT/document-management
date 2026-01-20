@@ -1,7 +1,7 @@
 import { eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
 import { db } from "../../db/database";
 import { documents } from "../../db/schema";
-import { cache } from "../cache/keyv";
+import { cache } from "../../cache/keyv";
 
 type Document = InferSelectModel<typeof documents>;
 type CreateDocument = InferInsertModel<typeof documents>;

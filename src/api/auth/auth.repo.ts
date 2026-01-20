@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/database";
 import { session, user } from "../../db/schema";
-import { cache } from "../cache/keyv";
+import { cache } from "../../cache/keyv";
 
 const USER_TTL = 8 * 60_000; // 8 minutes
 

@@ -1,7 +1,7 @@
 import { folders } from "../../db/schema";
 import { db } from "../../db/database";
 import { and, eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
-import { cache } from "../cache/keyv";
+import { cache } from "../../cache/keyv";
 
 export type Folder = InferSelectModel<typeof folders>;
 export type FolderCreate = Omit<InferInsertModel<typeof folders>, "id">;
