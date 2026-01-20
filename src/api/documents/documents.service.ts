@@ -10,25 +10,39 @@ import { APIError } from "encore.dev/api";
 import { DocumentUpdateDTO } from "./documents.schema";
 import { secret } from "encore.dev/config";
 import { fileTypeFromBuffer } from "file-type";
+import {
+  downloadPDFUrl,
+  generatePDFDownloadURL,
+} from "../../jobs/pdf-conversion/pdf-conversion";
 
 const bucketName = secret("AWS_BUCKET_NAME");
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 const ALLOWED_MIME_TYPE = [
+  // .pdf
   "application/pdf",
 
+  // .doc, .dot, .wiz
   "application/msword",
+
+  // .docx
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 
+  // .xla, .xlb, .xlc, .xlm, .xls, .xlt, .xlw
   "application/vnd.ms-excel",
+
+  // .xlsx
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 
+  // .pot, .ppa, .pps, .ppt, .pwz
   "application/vnd.ms-powerpoint",
+
+  // .pptx
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 
-  "text/plain",
-  "text/csv",
-
+  // .png
   "image/png",
+
+  // .jpeg
   "image/jpeg",
 ];
 
@@ -77,7 +91,6 @@ const DocumentService = {
   upload: async ({
     filename,
     buffer,
-    mimeType,
     userId,
   }: {
     filename: string;
@@ -96,25 +109,45 @@ const DocumentService = {
     }
 
     const randomKey = crypto.randomUUID();
+
+    let newBuffer;
+    if (type.mime === "application/pdf") {
+      // Assign buffer reference for passing to the put command later
+      newBuffer = buffer;
+    } else {
+      // normalization to PDF
+      newBuffer = await downloadPDFUrl(
+        await generatePDFDownloadURL({
+          buffer,
+          filename,
+          contentType: type.mime,
+        }),
+      );
+    }
+
     const command = new PutObjectCommand({
       Bucket: bucketName(),
       Key: randomKey,
-      Body: buffer,
-      ContentType: mimeType,
+      Body: newBuffer,
+      ContentType: "application/pdf",
     });
     await s3.send(command);
 
+    const newFilename = `${filename.replace(" ", "_").split(".")[0]}`;
+
     const createdDocument = await DocumentRepository.create({
-      name: filename,
+      name: newFilename,
       storageKey: randomKey,
       userId: userId,
       status: "READY",
-      sizeBytes: buffer.length,
+      sizeBytes: newBuffer.length,
     });
 
     if (!createdDocument) {
       throw APIError.internal("Failed to create document");
     }
+
+    return createdDocument;
   },
   generateSignedUrl: async (id: string) => {
     const key = await DocumentRepository.getObjectKey(id);
