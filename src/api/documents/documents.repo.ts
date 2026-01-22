@@ -16,19 +16,48 @@ const DOCUMENT_TTL = 2 * 60_000; // 2 minutes
 const DOCUMENT_LIST_TTL = 5 * 60_000; // 5 minutes
 const STORAGE_KEY_TTL = 10 * 60_000; // 10 minutes
 
+const getDocumentsCacheVersion = async (userId: string): Promise<Number> => {
+  const key = `user:${userId}:documents:version`;
+  return (await cache.get<number>(key)) ?? 1;
+};
+
+const bumpDocumentsCacheVersion = async (userId: string) => {
+  const key = `user:${userId}:documents:version`;
+  await cache.set(key, Date.now());
+};
+
+const getCacheKeyForFinding = async (
+  userId: string,
+  params: DocumentParams,
+) => {
+  const version = await getDocumentsCacheVersion(userId);
+
+  const { folderId, limit, offset } = params;
+
+  return [
+    "documents",
+    "user",
+    userId,
+    `v${version}`,
+    folderId ? `folder:${folderId}` : "folder:all",
+    `limit:${limit}`,
+    `offset:${offset}`,
+  ].join(":");
+};
+
 const DocumentRepository = {
   findByUser: async (
     userId: string,
-    { folderId, limit, offset }: DocumentParams,
+    params: DocumentParams,
   ): Promise<Document[]> => {
-    const cacheKey = `user:${userId}-document:all`;
+    const cacheKey = await getCacheKeyForFinding(userId, params);
     const cached = await cache.get<Document[]>(cacheKey);
     if (cached) return cached;
 
     const cond = [eq(documents.userId, userId)];
 
-    if (folderId) {
-      cond.push(eq(documents.folderId, folderId));
+    if (params.folderId) {
+      cond.push(eq(documents.folderId, params.folderId));
     }
 
     const rows = await db
@@ -36,8 +65,8 @@ const DocumentRepository = {
       .from(documents)
       .where(and(...cond))
       .orderBy(documents.createdAt, documents.id)
-      .limit(limit)
-      .offset(offset);
+      .limit(params.limit)
+      .offset(params.offset);
 
     await cache.set(cacheKey, rows, DOCUMENT_LIST_TTL);
     return rows;
@@ -70,7 +99,7 @@ const DocumentRepository = {
       .values(data)
       .returning();
 
-    await cache.delete(`user:${createdDocument.userId}-document:all`);
+    await bumpDocumentsCacheVersion(createdDocument.userId);
     return createdDocument;
   },
   update: async (
@@ -84,7 +113,7 @@ const DocumentRepository = {
       .returning();
     await cache.delete(`document:${id}`);
     await cache.delete(`document:${id}:storageKey`);
-    await cache.delete(`user:${updatedDocument.userId}-document:all`);
+    await bumpDocumentsCacheVersion(updatedDocument.userId);
     return updatedDocument;
   },
   delete: async (id: string): Promise<Document | null> => {
@@ -94,7 +123,7 @@ const DocumentRepository = {
       .returning();
     await cache.delete(`document:${id}`);
     await cache.delete(`document:${id}:storageKey`);
-    await cache.delete(`user:${deletedDocument.userId}-document:all`);
+    await bumpDocumentsCacheVersion(deletedDocument.userId);
     return deletedDocument;
   },
   getObjectKey: async (id: string): Promise<string | null> => {

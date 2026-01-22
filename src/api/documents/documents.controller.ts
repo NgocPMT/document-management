@@ -4,7 +4,7 @@ import log from "encore.dev/log";
 import { getAuthData } from "~encore/auth";
 import DocumentService from "./documents.service";
 import { DocumentListRequest, DocumentUpdateDTO } from "./documents.interface";
-import { DocumentUpdateSchema } from "./documents.schema";
+import { DocumentGetAllSchema, DocumentUpdateSchema } from "./documents.schema";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
 const rateLimitingOptions = {
@@ -18,8 +18,15 @@ const rateLimiter = new RateLimiterMemory(rateLimitingOptions);
 export const readByUser = api(
   { expose: true, auth: true, method: "POST", path: "/v1/documents" },
   async (req: DocumentListRequest) => {
+    const result = DocumentGetAllSchema.safeParse(req);
+
+    if (!result.success) {
+      throw APIError.invalidArgument("Invalid request body");
+    }
+
+    const params = result.data;
     const authData = getAuthData();
-    return DocumentService.readByUser(authData.userID, req);
+    return DocumentService.readByUser(authData.userID, params);
   },
 );
 
