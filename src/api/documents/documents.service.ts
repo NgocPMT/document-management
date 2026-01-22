@@ -14,42 +14,9 @@ import {
   SharedDocumentCreateDTO,
 } from "./documents.schema";
 import { secret } from "encore.dev/config";
-import { fileTypeFromBuffer } from "file-type";
-import {
-  downloadPDFUrl,
-  generatePDFDownloadURL,
-} from "../../jobs/pdf-conversion/pdf-conversion";
+import { handleUploadWorkflow } from "../../workflows/upload.workflow";
 
 const bucketName = secret("AWS_BUCKET_NAME");
-const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
-const ALLOWED_MIME_TYPE = [
-  // .pdf
-  "application/pdf",
-
-  // .doc, .dot, .wiz
-  "application/msword",
-
-  // .docx
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-
-  // .xla, .xlb, .xlc, .xlm, .xls, .xlt, .xlw
-  "application/vnd.ms-excel",
-
-  // .xlsx
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-  // .pot, .ppa, .pps, .ppt, .pwz
-  "application/vnd.ms-powerpoint",
-
-  // .pptx
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-
-  // .png
-  "image/png",
-
-  // .jpeg
-  "image/jpeg",
-];
 
 const DocumentService = {
   readByUser: async (userId: string, params: DocumentGetAllDTO) => {
@@ -120,66 +87,15 @@ const DocumentService = {
     }
     return deletedDocument;
   },
-  upload: async ({
-    filename,
-    buffer,
-    userId,
-  }: {
+  upload: async (input: {
     filename: string;
     buffer: Buffer;
     mimeType: string;
     userId: string;
   }) => {
-    const type = await fileTypeFromBuffer(new Uint8Array(buffer));
+    const uploadInfo = await handleUploadWorkflow(input);
 
-    if (!type || !ALLOWED_MIME_TYPE.includes(type.mime)) {
-      throw APIError.invalidArgument("Invalid or spoofed file type");
-    }
-
-    if (buffer.length > MAX_SIZE) {
-      throw APIError.invalidArgument("File is too big (50MB max)");
-    }
-
-    const randomKey = crypto.randomUUID();
-
-    let newBuffer;
-    if (type.mime === "application/pdf") {
-      // Assign buffer reference for passing to the put command later
-      newBuffer = buffer;
-    } else {
-      // normalization to PDF
-      newBuffer = await downloadPDFUrl(
-        await generatePDFDownloadURL({
-          buffer,
-          filename,
-          contentType: type.mime,
-        }),
-      );
-    }
-
-    const command = new PutObjectCommand({
-      Bucket: bucketName(),
-      Key: randomKey,
-      Body: newBuffer,
-      ContentType: "application/pdf",
-    });
-    await s3.send(command);
-
-    const newFilename = `${filename.replace(" ", "_").split(".")[0]}`;
-
-    const createdDocument = await DocumentRepository.create({
-      name: newFilename,
-      storageKey: randomKey,
-      userId: userId,
-      status: "READY",
-      sizeBytes: newBuffer.length,
-    });
-
-    if (!createdDocument) {
-      throw APIError.internal("Failed to create document");
-    }
-
-    return createdDocument;
+    return uploadInfo;
   },
   generateSignedUrl: async (id: string, userId: string, ttl?: number) => {
     await DocumentService.validateDocument(id, userId);

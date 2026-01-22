@@ -92,7 +92,7 @@ export const upload = api.raw(
           try {
             const buffer = Buffer.concat(entry.data);
 
-            const createdDocument = await DocumentService.upload({
+            const { documentId, status } = await DocumentService.upload({
               filename: entry.filename,
               buffer,
               mimeType: entry.mimeType,
@@ -103,9 +103,8 @@ export const upload = api.raw(
             res.setHeader("Content-type", "application/json");
             res.end(
               JSON.stringify({
-                message: "Upload completed",
-                filename: createdDocument.name,
-                size: `${createdDocument.sizeBytes} bytes`,
+                documentId,
+                status,
               }),
             );
           } catch (err) {

@@ -15,6 +15,13 @@
       "when": 1769043495186,
       "tag": "0001_square_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769066904813,
+      "tag": "0002_charming_emma_frost",
+      "breakpoints": true
     }
   ]
 }

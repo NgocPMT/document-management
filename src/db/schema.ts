@@ -101,7 +101,7 @@ export const documents = p.pgTable(
       .references(() => user.id),
     sizeBytes: p.integer("size_bytes").notNull(),
     folderId: p.uuid("folder_id").references(() => folders.id),
-    status: documentStatusEnum().notNull(),
+    status: documentStatusEnum().notNull().default("UPLOADING"),
     createdAt: p.timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [

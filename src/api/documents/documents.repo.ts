@@ -2,6 +2,7 @@ import {
   and,
   desc,
   eq,
+  getTableColumns,
   ilike,
   InferInsertModel,
   InferSelectModel,
@@ -10,11 +11,14 @@ import { db } from "../../db/database";
 import { documents, documentShares } from "../../db/schema";
 import { cache } from "../../cache/keyv";
 
-type Document = InferSelectModel<typeof documents>;
+type DocumentWithStatus = InferSelectModel<typeof documents>;
+type Document = Omit<DocumentWithStatus, "status">;
 type SharedDocument = InferSelectModel<typeof documentShares>;
 type CreateShareDocument = InferInsertModel<typeof documentShares>;
-type CreateDocument = InferInsertModel<typeof documents>;
-type UpdateDocument = Partial<Omit<CreateDocument, "userId" | "createdAt">>;
+type CreateDocument = Omit<InferInsertModel<typeof documents>, "status">;
+type UpdateDocument = Partial<
+  Omit<CreateDocument, "userId" | "createdAt" | "status">
+>;
 type DocumentParams = {
   folderId?: string;
   limit: number;
@@ -71,10 +75,18 @@ const DocumentRepository = {
       cond.push(eq(documents.folderId, params.folderId));
     }
 
+    const { status, ...rest } = getTableColumns(documents);
+
     const rows = await db
-      .select()
+      .select(rest)
       .from(documents)
-      .where(and(...cond, eq(documents.userId, userId)))
+      .where(
+        and(
+          ...cond,
+          eq(documents.userId, userId),
+          eq(documents.status, "READY"),
+        ),
+      )
       .orderBy(documents.createdAt, documents.id)
       .limit(params.limit)
       .offset(params.offset);
@@ -114,9 +126,9 @@ const DocumentRepository = {
     await cache.set(cacheKey, rows, DOCUMENT_LIST_TTL);
     return rows;
   },
-  findOne: async (id: string): Promise<Document | null> => {
+  findOne: async (id: string): Promise<DocumentWithStatus | null> => {
     const cacheKey = `document:${id}`;
-    const cached = await cache.get<Document | null>(cacheKey);
+    const cached = await cache.get<DocumentWithStatus | null>(cacheKey);
     if (cached !== undefined) return cached;
 
     const [document] = await db
@@ -158,6 +170,13 @@ const DocumentRepository = {
     await cache.delete(`document:${id}:storageKey`);
     await bumpDocumentsCacheVersion(updatedDocument.userId);
     return updatedDocument;
+  },
+  updateStatus: async (
+    id: string,
+    status: "UPLOADING" | "PROCESSING" | "READY" | "FAILED",
+  ) => {
+    await db.update(documents).set({ status }).where(eq(documents.id, id));
+    await cache.delete(`document:${id}`);
   },
   delete: async (id: string): Promise<Document | null> => {
     const [deletedDocument] = await db
