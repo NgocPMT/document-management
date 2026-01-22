@@ -3,8 +3,16 @@ import busboy from "busboy";
 import log from "encore.dev/log";
 import { getAuthData } from "~encore/auth";
 import DocumentService from "./documents.service";
-import { DocumentListRequest, DocumentUpdateDTO } from "./documents.interface";
-import { DocumentGetAllSchema, DocumentUpdateSchema } from "./documents.schema";
+import {
+  DocumentListRequest,
+  DocumentSearchRequest,
+  DocumentUpdateDTO,
+} from "./documents.interface";
+import {
+  DocumentGetAllSchema,
+  DocumentSearchSchema,
+  DocumentUpdateSchema,
+} from "./documents.schema";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
 const rateLimitingOptions = {
@@ -209,8 +217,15 @@ export const share = api(
 // Search documents
 export const search = api(
   { expose: true, auth: true, method: "POST", path: "/v1/documents/search" },
-  async () => {
-    //todo
+  async (req: DocumentSearchRequest) => {
+    const result = DocumentSearchSchema.safeParse(req);
+    if (!result.success) {
+      throw APIError.invalidArgument("Invalid request body");
+    }
+
+    const authData = getAuthData();
+    const params = result.data;
+    return DocumentService.search(authData.userID, params);
   },
 );
 

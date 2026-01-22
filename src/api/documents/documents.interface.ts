@@ -9,3 +9,7 @@ export interface DocumentListRequest {
   limit: number;
   offset: number;
 }
+
+export interface DocumentSearchRequest extends DocumentListRequest {
+  search: string;
+}

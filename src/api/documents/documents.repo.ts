@@ -1,4 +1,10 @@
-import { and, eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
+import {
+  and,
+  eq,
+  ilike,
+  InferInsertModel,
+  InferSelectModel,
+} from "drizzle-orm";
 import { db } from "../../db/database";
 import { documents } from "../../db/schema";
 import { cache } from "../../cache/keyv";
@@ -29,6 +35,7 @@ const bumpDocumentsCacheVersion = async (userId: string) => {
 const getCacheKeyForFinding = async (
   userId: string,
   params: DocumentParams,
+  search?: string,
 ) => {
   const version = await getDocumentsCacheVersion(userId);
 
@@ -42,6 +49,7 @@ const getCacheKeyForFinding = async (
     folderId ? `folder:${folderId}` : "folder:all",
     `limit:${limit}`,
     `offset:${offset}`,
+    search ? `search:${search}` : undefined,
   ].join(":");
 };
 
@@ -54,7 +62,7 @@ const DocumentRepository = {
     const cached = await cache.get<Document[]>(cacheKey);
     if (cached) return cached;
 
-    const cond = [eq(documents.userId, userId)];
+    const cond = [];
 
     if (params.folderId) {
       cond.push(eq(documents.folderId, params.folderId));
@@ -63,7 +71,39 @@ const DocumentRepository = {
     const rows = await db
       .select()
       .from(documents)
-      .where(and(...cond))
+      .where(and(...cond, eq(documents.userId, userId)))
+      .orderBy(documents.createdAt, documents.id)
+      .limit(params.limit)
+      .offset(params.offset);
+
+    await cache.set(cacheKey, rows, DOCUMENT_LIST_TTL);
+    return rows;
+  },
+  findByName: async (
+    search: string,
+    userId: string,
+    params: DocumentParams,
+  ) => {
+    const cacheKey = await getCacheKeyForFinding(userId, params, search);
+    const cached = await cache.get<Document[]>(cacheKey);
+    if (cached) return cached;
+
+    const cond = [];
+
+    if (params.folderId) {
+      cond.push(eq(documents.folderId, params.folderId));
+    }
+
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(
+        and(
+          ...cond,
+          eq(documents.userId, userId),
+          ilike(documents.name, `%${search}%`),
+        ),
+      )
       .orderBy(documents.createdAt, documents.id)
       .limit(params.limit)
       .offset(params.offset);

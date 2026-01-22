@@ -7,14 +7,17 @@ import DocumentRepository from "./documents.repo";
 import { s3 } from "../../storage/s3.client";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { APIError } from "encore.dev/api";
-import { DocumentGetAllDTO, DocumentUpdateDTO } from "./documents.schema";
+import {
+  DocumentGetAllDTO,
+  DocumentSearchDTO,
+  DocumentUpdateDTO,
+} from "./documents.schema";
 import { secret } from "encore.dev/config";
 import { fileTypeFromBuffer } from "file-type";
 import {
   downloadPDFUrl,
   generatePDFDownloadURL,
 } from "../../jobs/pdf-conversion/pdf-conversion";
-import FolderService from "../folders/folders.service";
 
 const bucketName = secret("AWS_BUCKET_NAME");
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -50,6 +53,11 @@ const ALLOWED_MIME_TYPE = [
 const DocumentService = {
   readByUser: async (userId: string, params: DocumentGetAllDTO) => {
     const documents = await DocumentRepository.findByUser(userId, params);
+    return documents;
+  },
+  search: async (userId: string, params: DocumentSearchDTO) => {
+    const { search, ...rest } = params;
+    const documents = await DocumentRepository.findByName(search, userId, rest);
     return documents;
   },
   readOne: async (id: string, userId: string) => {
