@@ -1,4 +1,4 @@
-import { eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
+import { and, eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
 import { db } from "../../db/database";
 import { documents } from "../../db/schema";
 import { cache } from "../../cache/keyv";
@@ -6,21 +6,38 @@ import { cache } from "../../cache/keyv";
 type Document = InferSelectModel<typeof documents>;
 type CreateDocument = InferInsertModel<typeof documents>;
 type UpdateDocument = Partial<Omit<CreateDocument, "userId" | "createdAt">>;
+type DocumentParams = {
+  folderId?: string;
+  limit: number;
+  offset: number;
+};
 
 const DOCUMENT_TTL = 2 * 60_000; // 2 minutes
 const DOCUMENT_LIST_TTL = 5 * 60_000; // 5 minutes
 const STORAGE_KEY_TTL = 10 * 60_000; // 10 minutes
 
 const DocumentRepository = {
-  findByUser: async (userId: string): Promise<Document[]> => {
+  findByUser: async (
+    userId: string,
+    { folderId, limit, offset }: DocumentParams,
+  ): Promise<Document[]> => {
     const cacheKey = `user:${userId}-document:all`;
     const cached = await cache.get<Document[]>(cacheKey);
     if (cached) return cached;
 
+    const cond = [eq(documents.userId, userId)];
+
+    if (folderId) {
+      cond.push(eq(documents.folderId, folderId));
+    }
+
     const rows = await db
       .select()
       .from(documents)
-      .where(eq(documents.userId, userId));
+      .where(and(...cond))
+      .orderBy(documents.createdAt, documents.id)
+      .limit(limit)
+      .offset(offset);
 
     await cache.set(cacheKey, rows, DOCUMENT_LIST_TTL);
     return rows;
@@ -38,6 +55,13 @@ const DocumentRepository = {
     const cacheValue = document ?? null;
 
     await cache.set(cacheKey, cacheValue, DOCUMENT_TTL);
+    return document;
+  },
+  getIdAndUserId: async (id: string) => {
+    const [document] = await db
+      .select({ id: documents.id, userId: documents.userId })
+      .from(documents)
+      .where(eq(documents.id, id));
     return document;
   },
   create: async (data: CreateDocument): Promise<Document | null> => {

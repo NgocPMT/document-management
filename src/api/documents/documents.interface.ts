@@ -3,3 +3,9 @@ export interface DocumentUpdateDTO {
   folderId?: string;
   status?: string;
 }
+
+export interface DocumentListRequest {
+  folderId?: string;
+  limit: number;
+  offset: number;
+}

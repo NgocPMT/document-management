@@ -24,6 +24,14 @@ const FolderRepository = {
     return rows;
   },
 
+  getIdAndUserId: async (id: string) => {
+    const [folder] = await db
+      .select({ id: folders.id, userId: folders.userId })
+      .from(folders)
+      .where(eq(folders.id, id));
+    return folder;
+  },
+
   create: async (data: FolderCreate): Promise<Folder | null> => {
     const [createdFolder] = await db.insert(folders).values(data).returning();
 

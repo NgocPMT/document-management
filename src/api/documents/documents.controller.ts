@@ -3,7 +3,7 @@ import busboy from "busboy";
 import log from "encore.dev/log";
 import { getAuthData } from "~encore/auth";
 import DocumentService from "./documents.service";
-import { DocumentUpdateDTO } from "./documents.interface";
+import { DocumentListRequest, DocumentUpdateDTO } from "./documents.interface";
 import { DocumentUpdateSchema } from "./documents.schema";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
@@ -14,12 +14,12 @@ const rateLimitingOptions = {
 
 const rateLimiter = new RateLimiterMemory(rateLimitingOptions);
 
-// List documents (with filters, pagination)
-export const read = api(
+// List documents by user (with filter by userId, pagination)
+export const readByUser = api(
   { expose: true, auth: true, method: "POST", path: "/v1/documents" },
-  async () => {
+  async (req: DocumentListRequest) => {
     const authData = getAuthData();
-    return DocumentService.readByUser(authData.userID);
+    return DocumentService.readByUser(authData.userID, req);
   },
 );
 

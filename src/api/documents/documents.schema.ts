@@ -1,6 +1,12 @@
 import * as z from "zod";
 import { documentStatusEnum } from "../../db/schema";
 
+export const DocumentGetAllSchema = z.object({
+  folderId: z.string().optional(),
+  limit: z.coerce.number().int().positive(),
+  offset: z.coerce.number().int().positive(),
+});
+
 export const DocumentCreateSchema = z.object({
   name: z.string(),
   key: z.string(),
@@ -16,5 +22,6 @@ export const DocumentUpdateSchema = z.object({
   status: z.enum(documentStatusEnum.enumValues).optional(),
 });
 
+export type DocumentGetAllDTO = z.infer<typeof DocumentGetAllSchema>;
 export type DocumentCreateDTO = z.infer<typeof DocumentCreateSchema>;
 export type DocumentUpdateDTO = z.infer<typeof DocumentUpdateSchema>;

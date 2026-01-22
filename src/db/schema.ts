@@ -15,19 +15,23 @@ export const userRelations = relations(user, ({ many }) => ({
   folders: many(folders),
 }));
 
-export const session = p.pgTable("session", {
-  id: p.text("id").primaryKey(),
-  expiresAt: p.timestamp("expires_at").notNull(),
-  token: p.text("token").notNull().unique(),
-  createdAt: p.timestamp("created_at").notNull().defaultNow(),
-  updatedAt: p.timestamp("updated_at").notNull().defaultNow(),
-  ipAddress: p.text("ip_address"),
-  userAgent: p.text("user_agent"),
-  userId: p
-    .text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-});
+export const session = p.pgTable(
+  "session",
+  {
+    id: p.text("id").primaryKey(),
+    expiresAt: p.timestamp("expires_at").notNull(),
+    token: p.text("token").notNull().unique(),
+    createdAt: p.timestamp("created_at").notNull().defaultNow(),
+    updatedAt: p.timestamp("updated_at").notNull().defaultNow(),
+    ipAddress: p.text("ip_address"),
+    userAgent: p.text("user_agent"),
+    userId: p
+      .text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [p.index("session_user_id").on(table.userId)],
+);
 
 export const account = p.pgTable("account", {
   id: p.text("id").primaryKey(),
@@ -57,15 +61,19 @@ export const verification = p.pgTable("verification", {
   updatedAt: p.timestamp("updated_at"),
 });
 
-export const folders = p.pgTable("folders", {
-  id: p.uuid("id").defaultRandom().primaryKey(),
-  name: p.text("name").notNull(),
-  createdAt: p.timestamp("created_at").notNull().defaultNow(),
-  userId: p
-    .text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-});
+export const folders = p.pgTable(
+  "folders",
+  {
+    id: p.uuid("id").defaultRandom().primaryKey(),
+    name: p.text("name").notNull(),
+    createdAt: p.timestamp("created_at").notNull().defaultNow(),
+    userId: p
+      .text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [p.index("folder_user_id_idx").on(table.userId)],
+);
 
 export const foldersRelations = relations(folders, ({ one }) => ({
   user: one(user, {
@@ -81,19 +89,31 @@ export const documentStatusEnum = p.pgEnum("document_status", [
   "FAILED",
 ]);
 
-export const documents = p.pgTable("documents", {
-  id: p.uuid("id").defaultRandom().primaryKey(),
-  name: p.text("name").notNull(),
-  storageKey: p.text("storage_key").notNull(),
-  userId: p
-    .text("user_id")
-    .notNull()
-    .references(() => user.id),
-  sizeBytes: p.integer("size_bytes").notNull(),
-  folderId: p.uuid("folder_id").references(() => folders.id),
-  status: documentStatusEnum().notNull(),
-  createdAt: p.timestamp("created_at").notNull().defaultNow(),
-});
+export const documents = p.pgTable(
+  "documents",
+  {
+    id: p.uuid("id").defaultRandom().primaryKey(),
+    name: p.text("name").notNull(),
+    storageKey: p.text("storage_key").notNull(),
+    userId: p
+      .text("user_id")
+      .notNull()
+      .references(() => user.id),
+    sizeBytes: p.integer("size_bytes").notNull(),
+    folderId: p.uuid("folder_id").references(() => folders.id),
+    status: documentStatusEnum().notNull(),
+    createdAt: p.timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    p.index("documents_user_id_idx").on(table.userId),
+    p.index("documents_folder_id_idx").on(table.folderId),
+    p.index("documents_status_idx").on(table.status),
+    p
+      .index("documents_user_id_created_at_idx")
+      .on(table.userId, table.createdAt),
+    p.index("documents_name_idx").on(table.name),
+  ],
+);
 
 export const documentsRelations = relations(documents, ({ one, many }) => ({
   folder: one(folders, {
@@ -135,14 +155,18 @@ export const documentSharesRelations = relations(documentShares, ({ one }) => ({
   }),
 }));
 
-export const documentSummary = p.pgTable("document_summary", {
-  documentId: p
-    .uuid("document_id")
-    .notNull()
-    .references(() => documents.id),
-  summary: p.text().notNull(),
-  createdAt: p.timestamp().notNull().defaultNow(),
-});
+export const documentSummary = p.pgTable(
+  "document_summary",
+  {
+    documentId: p
+      .uuid("document_id")
+      .notNull()
+      .references(() => documents.id),
+    summary: p.text().notNull(),
+    createdAt: p.timestamp().notNull().defaultNow(),
+  },
+  (table) => [p.index("document_summary_document_id_idx").on(table.documentId)],
+);
 
 export const documentSummaryRelations = relations(
   documentSummary,

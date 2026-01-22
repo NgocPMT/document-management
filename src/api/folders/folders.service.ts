@@ -8,6 +8,19 @@ const FolderService = {
     return folders;
   },
 
+  validateFolder: async (id: string, userId: string) => {
+    const folder = await FolderRepository.getIdAndUserId(id);
+
+    if (!folder) {
+      throw APIError.notFound("Folder not found");
+    }
+
+    if (folder.userId !== userId) {
+      throw APIError.permissionDenied("Forbidden");
+    }
+    return folder;
+  },
+
   create: async (data: FolderCreateDTO & { userId: string }) => {
     const createdFolder = await FolderRepository.create(data);
 
@@ -19,6 +32,8 @@ const FolderService = {
   },
 
   update: async (id: string, data: FolderUpdateDTO, userId: string) => {
+    await FolderService.validateFolder(id, userId);
+
     const updatedFolder = await FolderRepository.update(id, data, userId);
 
     if (!updatedFolder) {
@@ -29,6 +44,8 @@ const FolderService = {
   },
 
   delete: async (id: string, userId: string) => {
+    await FolderService.validateFolder(id, userId);
+
     const deletedFolder = await FolderRepository.delete(id, userId);
 
     if (!deletedFolder) {

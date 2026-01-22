@@ -7,13 +7,14 @@ import DocumentRepository from "./documents.repo";
 import { s3 } from "../../storage/s3.client";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { APIError } from "encore.dev/api";
-import { DocumentUpdateDTO } from "./documents.schema";
+import { DocumentGetAllDTO, DocumentUpdateDTO } from "./documents.schema";
 import { secret } from "encore.dev/config";
 import { fileTypeFromBuffer } from "file-type";
 import {
   downloadPDFUrl,
   generatePDFDownloadURL,
 } from "../../jobs/pdf-conversion/pdf-conversion";
+import FolderService from "../folders/folders.service";
 
 const bucketName = secret("AWS_BUCKET_NAME");
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -47,8 +48,8 @@ const ALLOWED_MIME_TYPE = [
 ];
 
 const DocumentService = {
-  readByUser: async (userId: string) => {
-    const documents = await DocumentRepository.findByUser(userId);
+  readByUser: async (userId: string, params: DocumentGetAllDTO) => {
+    const documents = await DocumentRepository.findByUser(userId, params);
     return documents;
   },
   readOne: async (id: string, userId: string) => {
@@ -62,9 +63,20 @@ const DocumentService = {
     }
     return document;
   },
+  validateDocument: async (id: string, userId: string) => {
+    const document = await DocumentRepository.getIdAndUserId(id);
+    if (!document) {
+      throw APIError.notFound("Document not found");
+    }
+
+    if (document.userId !== userId) {
+      throw APIError.permissionDenied("Forbidden");
+    }
+    return document;
+  },
   update: async (id: string, data: DocumentUpdateDTO, userId: string) => {
     // validate user permission and document existence
-    await DocumentService.readOne(id, userId);
+    await DocumentService.validateDocument(id, userId);
 
     const updatedDocument = await DocumentRepository.update(id, data);
     if (!updatedDocument) {
