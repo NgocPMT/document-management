@@ -1,15 +1,18 @@
 import {
   and,
+  desc,
   eq,
   ilike,
   InferInsertModel,
   InferSelectModel,
 } from "drizzle-orm";
 import { db } from "../../db/database";
-import { documents } from "../../db/schema";
+import { documents, documentShares } from "../../db/schema";
 import { cache } from "../../cache/keyv";
 
 type Document = InferSelectModel<typeof documents>;
+type SharedDocument = InferSelectModel<typeof documentShares>;
+type CreateShareDocument = InferInsertModel<typeof documentShares>;
 type CreateDocument = InferInsertModel<typeof documents>;
 type UpdateDocument = Partial<Omit<CreateDocument, "userId" | "createdAt">>;
 type DocumentParams = {
@@ -83,7 +86,7 @@ const DocumentRepository = {
     search: string,
     userId: string,
     params: DocumentParams,
-  ) => {
+  ): Promise<Document[]> => {
     const cacheKey = await getCacheKeyForFinding(userId, params, search);
     const cached = await cache.get<Document[]>(cacheKey);
     if (cached) return cached;
@@ -104,7 +107,7 @@ const DocumentRepository = {
           ilike(documents.name, `%${search}%`),
         ),
       )
-      .orderBy(documents.createdAt, documents.id)
+      .orderBy(desc(documents.createdAt), documents.id)
       .limit(params.limit)
       .offset(params.offset);
 
@@ -165,6 +168,32 @@ const DocumentRepository = {
     await cache.delete(`document:${id}:storageKey`);
     await bumpDocumentsCacheVersion(deletedDocument.userId);
     return deletedDocument;
+  },
+  createSharedDocument: async (
+    data: CreateShareDocument,
+  ): Promise<SharedDocument> => {
+    const [sharedDocument] = await db
+      .insert(documentShares)
+      .values(data)
+      .returning();
+    return sharedDocument;
+  },
+  findSharedDocument: async (
+    documentId: string,
+    userId: string,
+  ): Promise<SharedDocument | null> => {
+    const [sharedDocument] = await db
+      .select()
+      .from(documentShares)
+      .where(
+        and(
+          eq(documentShares.documentId, documentId),
+          eq(documentShares.userId, userId),
+        ),
+      )
+      .orderBy(desc(documentShares.expiresAt))
+      .limit(1);
+    return sharedDocument ?? null;
   },
   getObjectKey: async (id: string): Promise<string | null> => {
     const cacheKey = `document:${id}:storageKey`;

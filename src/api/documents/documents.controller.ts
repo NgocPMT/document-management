@@ -6,12 +6,14 @@ import DocumentService from "./documents.service";
 import {
   DocumentListRequest,
   DocumentSearchRequest,
-  DocumentUpdateDTO,
+  DocumentShareRequest,
+  DocumentUpdateRequest,
 } from "./documents.interface";
 import {
   DocumentGetAllSchema,
   DocumentSearchSchema,
   DocumentUpdateSchema,
+  SharedDocumentCreateSchema,
 } from "./documents.schema";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
@@ -160,7 +162,11 @@ export const download = api.raw(
         return;
       }
 
-      const signedUrl = await DocumentService.generateSignedUrl(id);
+      const authData = getAuthData();
+      const signedUrl = await DocumentService.generateSignedUrl(
+        id,
+        authData.userID,
+      );
 
       if (!signedUrl) {
         res.statusCode = 404;
@@ -183,7 +189,7 @@ export const download = api.raw(
 // Update document metadata
 export const update = api(
   { expose: true, auth: true, method: "PUT", path: "/v1/documents/:id" },
-  async ({ id, body }: { id: string; body: DocumentUpdateDTO }) => {
+  async ({ id, body }: { id: string; body: DocumentUpdateRequest }) => {
     const result = DocumentUpdateSchema.safeParse(body);
     if (!result.success) {
       throw APIError.invalidArgument(
@@ -209,8 +215,16 @@ export const destroy = api(
 // Share document with user
 export const share = api(
   { expose: true, auth: true, method: "POST", path: "/v1/documents/:id/share" },
-  async ({ id }: { id: string }) => {
-    //todo
+  async ({ id, body }: { id: string; body: DocumentShareRequest }) => {
+    const result = SharedDocumentCreateSchema.safeParse(body);
+
+    if (!result.success) {
+      throw APIError.invalidArgument("Invalid share body");
+    }
+
+    const authData = getAuthData();
+    const data = result.data;
+    return DocumentService.shareDocument(id, authData.userID, data);
   },
 );
 

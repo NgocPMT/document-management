@@ -11,6 +11,7 @@ import {
   DocumentGetAllDTO,
   DocumentSearchDTO,
   DocumentUpdateDTO,
+  SharedDocumentCreateDTO,
 } from "./documents.schema";
 import { secret } from "encore.dev/config";
 import { fileTypeFromBuffer } from "file-type";
@@ -67,8 +68,9 @@ const DocumentService = {
     }
 
     if (document.userId !== userId) {
-      throw APIError.permissionDenied("Forbidden");
+      await DocumentService.validateSharedDocument(id, userId);
     }
+
     return document;
   },
   validateDocument: async (id: string, userId: string) => {
@@ -78,9 +80,19 @@ const DocumentService = {
     }
 
     if (document.userId !== userId) {
-      throw APIError.permissionDenied("Forbidden");
+      DocumentService.validateSharedDocument(id, userId);
     }
     return document;
+  },
+  validateSharedDocument: async (documentId: string, userId: string) => {
+    const sharedDocument = await DocumentRepository.findSharedDocument(
+      documentId,
+      userId,
+    );
+    if (!sharedDocument || new Date() > sharedDocument.expiresAt) {
+      throw APIError.permissionDenied("Forbidden");
+    }
+    return documentId;
   },
   update: async (id: string, data: DocumentUpdateDTO, userId: string) => {
     // validate user permission and document existence
@@ -169,7 +181,8 @@ const DocumentService = {
 
     return createdDocument;
   },
-  generateSignedUrl: async (id: string) => {
+  generateSignedUrl: async (id: string, userId: string, ttl?: number) => {
+    await DocumentService.validateDocument(id, userId);
     const key = await DocumentRepository.getObjectKey(id);
 
     if (!key) {
@@ -181,10 +194,21 @@ const DocumentService = {
     });
 
     const signedUrl = await getSignedUrl(s3, command, {
-      expiresIn: 60,
+      expiresIn: ttl || 60,
     });
 
     return signedUrl;
+  },
+  shareDocument: async (
+    documentId: string,
+    userId: string,
+    data: SharedDocumentCreateDTO,
+  ) => {
+    await DocumentService.validateDocument(documentId, userId);
+    const createdSharedDocument = await DocumentRepository.createSharedDocument(
+      { ...data, documentId },
+    );
+    return createdSharedDocument;
   },
 };
 

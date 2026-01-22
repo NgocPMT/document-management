@@ -23,6 +23,11 @@ export const DocumentCreateSchema = z.object({
   status: z.enum(documentStatusEnum.enumValues),
 });
 
+export const SharedDocumentCreateSchema = z.object({
+  userId: z.string(),
+  expiresAt: z.coerce.date(),
+});
+
 export const DocumentUpdateSchema = z.object({
   name: z.string().optional(),
   folderId: z.string().optional(),
@@ -32,4 +37,7 @@ export const DocumentUpdateSchema = z.object({
 export type DocumentGetAllDTO = z.infer<typeof DocumentGetAllSchema>;
 export type DocumentSearchDTO = z.infer<typeof DocumentSearchSchema>;
 export type DocumentCreateDTO = z.infer<typeof DocumentCreateSchema>;
+export type SharedDocumentCreateDTO = z.infer<
+  typeof SharedDocumentCreateSchema
+>;
 export type DocumentUpdateDTO = z.infer<typeof DocumentUpdateSchema>;
