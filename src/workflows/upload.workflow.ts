@@ -1,4 +1,3 @@
-import { APIError } from "encore.dev/api";
 import { fileTypeFromBuffer } from "file-type";
 import {
   downloadPDFUrl,
@@ -6,10 +5,10 @@ import {
 } from "../jobs/pdf-conversion/pdf-conversion";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3 } from "../storage/s3.client";
-import { secret } from "encore.dev/config";
 import DocumentRepository from "../api/documents/documents.repo";
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import { string } from "zod";
+import { bucketName } from "./encore.service";
+import { handleCreateAISummaryWorkflow } from "./summary.workflow";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 const ALLOWED_MIME_TYPE = [
@@ -81,8 +80,6 @@ const generateRandomStorageKeyStep = async () => {
   return crypto.randomUUID();
 };
 
-const bucketName = secret("AWS_BUCKET_NAME");
-
 const uploadToStorageStep = async (buffer: Buffer, storageKey: string) => {
   DBOS.logger.info("Uploading file to storage");
   const command = new PutObjectCommand({
@@ -146,6 +143,9 @@ const processDocumentWorkflow = async ({
     );
 
     DBOS.logger.info("Document processing completed");
+
+    // Background document summary generating
+    handleCreateAISummaryWorkflow({ documentId, pdfBuffer });
   } catch (err) {
     await DBOS.runStep(() =>
       DocumentRepository.updateStatus(documentId, "FAILED"),
@@ -179,7 +179,7 @@ const uploadWorkflow = async ({
     DocumentRepository.updateStatus(document.id, "PROCESSING"),
   );
 
-  // background processing
+  // background document processing
   handleProcessDocumentWorkflow({
     documentId: document.id,
     filename,

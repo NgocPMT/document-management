@@ -28,6 +28,11 @@ export const SharedDocumentCreateSchema = z.object({
   expiresAt: z.coerce.date(),
 });
 
+export const DocumentSummaryCreateSchema = z.object({
+  documentId: z.string(),
+  summary: z.string(),
+});
+
 export const DocumentUpdateSchema = z.object({
   name: z.string().optional(),
   folderId: z.string().optional(),
@@ -39,5 +44,8 @@ export type DocumentSearchDTO = z.infer<typeof DocumentSearchSchema>;
 export type DocumentCreateDTO = z.infer<typeof DocumentCreateSchema>;
 export type SharedDocumentCreateDTO = z.infer<
   typeof SharedDocumentCreateSchema
+>;
+export type DocumentSummaryCreateDTO = z.infer<
+  typeof DocumentSummaryCreateSchema
 >;
 export type DocumentUpdateDTO = z.infer<typeof DocumentUpdateSchema>;

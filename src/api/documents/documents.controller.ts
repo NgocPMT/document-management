@@ -251,6 +251,7 @@ export const summary = api(
     path: "/v1/documents/:id/summary",
   },
   async ({ id }: { id: string }) => {
-    //todo
+    const authData = getAuthData();
+    return DocumentService.getDocumentSummary(id, authData.userID);
   },
 );

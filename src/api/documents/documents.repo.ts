@@ -8,17 +8,18 @@ import {
   InferSelectModel,
 } from "drizzle-orm";
 import { db } from "../../db/database";
-import { documents, documentShares } from "../../db/schema";
+import { documents, documentShares, documentSummary } from "../../db/schema";
 import { cache } from "../../cache/keyv";
 
 type DocumentWithStatus = InferSelectModel<typeof documents>;
 type Document = Omit<DocumentWithStatus, "status">;
-type SharedDocument = InferSelectModel<typeof documentShares>;
-type CreateShareDocument = InferInsertModel<typeof documentShares>;
 type CreateDocument = Omit<InferInsertModel<typeof documents>, "status">;
 type UpdateDocument = Partial<
   Omit<CreateDocument, "userId" | "createdAt" | "status">
 >;
+type SharedDocument = InferSelectModel<typeof documentShares>;
+type CreateShareDocument = InferInsertModel<typeof documentShares>;
+type CreateDocumentSummary = InferInsertModel<typeof documentSummary>;
 type DocumentParams = {
   folderId?: string;
   limit: number;
@@ -94,6 +95,7 @@ const DocumentRepository = {
     await cache.set(cacheKey, rows, DOCUMENT_LIST_TTL);
     return rows;
   },
+
   findByName: async (
     search: string,
     userId: string,
@@ -126,6 +128,7 @@ const DocumentRepository = {
     await cache.set(cacheKey, rows, DOCUMENT_LIST_TTL);
     return rows;
   },
+
   findOne: async (id: string): Promise<DocumentWithStatus | null> => {
     const cacheKey = `document:${id}`;
     const cached = await cache.get<DocumentWithStatus | null>(cacheKey);
@@ -141,6 +144,7 @@ const DocumentRepository = {
     await cache.set(cacheKey, cacheValue, DOCUMENT_TTL);
     return document;
   },
+
   getIdAndUserId: async (id: string) => {
     const [document] = await db
       .select({ id: documents.id, userId: documents.userId })
@@ -148,6 +152,7 @@ const DocumentRepository = {
       .where(eq(documents.id, id));
     return document;
   },
+
   create: async (data: CreateDocument): Promise<Document | null> => {
     const [createdDocument] = await db
       .insert(documents)
@@ -157,6 +162,7 @@ const DocumentRepository = {
     await bumpDocumentsCacheVersion(createdDocument.userId);
     return createdDocument;
   },
+
   update: async (
     id: string,
     data: UpdateDocument,
@@ -171,6 +177,7 @@ const DocumentRepository = {
     await bumpDocumentsCacheVersion(updatedDocument.userId);
     return updatedDocument;
   },
+
   updateStatus: async (
     id: string,
     status: "UPLOADING" | "PROCESSING" | "READY" | "FAILED",
@@ -178,6 +185,7 @@ const DocumentRepository = {
     await db.update(documents).set({ status }).where(eq(documents.id, id));
     await cache.delete(`document:${id}`);
   },
+
   delete: async (id: string): Promise<Document | null> => {
     const [deletedDocument] = await db
       .delete(documents)
@@ -188,6 +196,7 @@ const DocumentRepository = {
     await bumpDocumentsCacheVersion(deletedDocument.userId);
     return deletedDocument;
   },
+
   createSharedDocument: async (
     data: CreateShareDocument,
   ): Promise<SharedDocument> => {
@@ -197,6 +206,7 @@ const DocumentRepository = {
       .returning();
     return sharedDocument;
   },
+
   findSharedDocument: async (
     documentId: string,
     userId: string,
@@ -214,6 +224,20 @@ const DocumentRepository = {
       .limit(1);
     return sharedDocument ?? null;
   },
+
+  createDocumentSummary: async (data: CreateDocumentSummary) => {
+    const [summary] = await db.insert(documentSummary).values(data).returning();
+    return summary;
+  },
+
+  getDocumentSummary: async (documentId: string) => {
+    const [summary] = await db
+      .select()
+      .from(documentSummary)
+      .where(eq(documentSummary.documentId, documentId));
+    return summary;
+  },
+
   getObjectKey: async (id: string): Promise<string | null> => {
     const cacheKey = `document:${id}:storageKey`;
     const cached = await cache.get<string | null>(cacheKey);

@@ -10,6 +10,7 @@ import { APIError } from "encore.dev/api";
 import {
   DocumentGetAllDTO,
   DocumentSearchDTO,
+  DocumentSummaryCreateDTO,
   DocumentUpdateDTO,
   SharedDocumentCreateDTO,
 } from "./documents.schema";
@@ -23,11 +24,13 @@ const DocumentService = {
     const documents = await DocumentRepository.findByUser(userId, params);
     return documents;
   },
+
   search: async (userId: string, params: DocumentSearchDTO) => {
     const { search, ...rest } = params;
     const documents = await DocumentRepository.findByName(search, userId, rest);
     return documents;
   },
+
   readOne: async (id: string, userId: string) => {
     const document = await DocumentRepository.findOne(id);
     if (!document) {
@@ -40,6 +43,7 @@ const DocumentService = {
 
     return document;
   },
+
   validateDocument: async (id: string, userId: string) => {
     const document = await DocumentRepository.getIdAndUserId(id);
     if (!document) {
@@ -51,6 +55,7 @@ const DocumentService = {
     }
     return document;
   },
+
   validateSharedDocument: async (documentId: string, userId: string) => {
     const sharedDocument = await DocumentRepository.findSharedDocument(
       documentId,
@@ -61,6 +66,7 @@ const DocumentService = {
     }
     return documentId;
   },
+
   update: async (id: string, data: DocumentUpdateDTO, userId: string) => {
     // validate user permission and document existence
     await DocumentService.validateDocument(id, userId);
@@ -71,6 +77,7 @@ const DocumentService = {
     }
     return updatedDocument;
   },
+
   delete: async (id: string, userId: string) => {
     // validate user permission and document existence
     const document = await DocumentService.readOne(id, userId);
@@ -87,6 +94,7 @@ const DocumentService = {
     }
     return deletedDocument;
   },
+
   upload: async (input: {
     filename: string;
     buffer: Buffer;
@@ -97,6 +105,7 @@ const DocumentService = {
 
     return uploadInfo;
   },
+
   generateSignedUrl: async (id: string, userId: string, ttl?: number) => {
     await DocumentService.validateDocument(id, userId);
     const key = await DocumentRepository.getObjectKey(id);
@@ -115,6 +124,7 @@ const DocumentService = {
 
     return signedUrl;
   },
+
   shareDocument: async (
     documentId: string,
     userId: string,
@@ -125,6 +135,22 @@ const DocumentService = {
       { ...data, documentId },
     );
     return createdSharedDocument;
+  },
+
+  createDocumentSummary: async (data: DocumentSummaryCreateDTO) => {
+    const summary = await DocumentRepository.createDocumentSummary(data);
+    return summary;
+  },
+
+  getDocumentSummary: async (documentId: string, userId: string) => {
+    await DocumentService.validateDocument(documentId, userId);
+    const summary = await DocumentRepository.getDocumentSummary(documentId);
+
+    if (!summary) {
+      throw APIError.notFound("Document summary not found");
+    }
+
+    return summary;
   },
 };
 
