@@ -5,12 +5,17 @@
   "description": "Simple Document Management",
   "license": "MPL-2.0",
   "type": "module",
+  "scripts": {
+    "dev": "encore run",
+    "test": "vitest"
+  },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/node": "^20.5.7",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
