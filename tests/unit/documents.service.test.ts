@@ -9,25 +9,29 @@ import { s3 } from "../../src/storage/s3.client";
 import { handleUploadWorkflow } from "../../src/workflows/upload.workflow";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+// Mock get signed url method from AWS SDK
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: vi.fn(),
 }));
 
+// Mock test bucket secret name
 vi.mock("encore.dev/config", () => ({
   secret: () => () => "test-bucket",
 }));
 
+// Mock send method from S3 client instance
 vi.mock("../../src/storage/s3.client", () => ({
   s3: {
     send: vi.fn(),
   },
 }));
 
-/* Mock workflow */
+// Mock workflow
 vi.mock("../../src/workflows/upload.workflow", () => ({
   handleUploadWorkflow: vi.fn(),
 }));
 
+// Mock repository
 vi.mock("../../src/api/documents/documents.repo.ts", () => ({
   default: {
     findByUser: vi.fn(),

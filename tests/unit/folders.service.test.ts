@@ -1,4 +1,3 @@
-// tests/unit/folder.service.test.ts
 import { describe, it, expect, vi, beforeEach, expectTypeOf } from "vitest";
 import FolderService from "../../src/api/folders/folders.service";
 import FolderRepository from "../../src/api/folders/folders.repo";
@@ -9,7 +8,7 @@ import {
   folderUpdateDTO,
 } from "../fixtures/folder.fixture";
 
-/* Mock repository */
+// Mock repository
 vi.mock("../../src/api/folders/folders.repo", () => ({
   default: {
     find: vi.fn(),
