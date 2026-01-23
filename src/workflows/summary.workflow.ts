@@ -5,7 +5,7 @@ import DocumentRepository from "../api/documents/documents.repo";
 import { PDFParse } from "pdf-parse";
 
 const extractTextFromBuffer = async (buffer: Buffer) => {
-  DBOS.logger.info("Getting file content...");
+  DBOS.logger.info("Extracting text from PDF buffer...");
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const result = await parser.getText();
   await parser.destroy();
@@ -13,7 +13,7 @@ const extractTextFromBuffer = async (buffer: Buffer) => {
 };
 
 const getSummaryFromGeminiStep = async (text: string) => {
-  DBOS.logger.info("Generating AI summary...");
+  DBOS.logger.info("Generating summary from Gemini...");
   const result = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: createUserContent([
@@ -21,6 +21,7 @@ const getSummaryFromGeminiStep = async (text: string) => {
     ]),
   });
   if (!result.text) {
+    DBOS.logger.error("Failed to generate summary from Gemini");
     throw new Error("Failed generating summary");
   }
   return result.text;
@@ -33,7 +34,7 @@ const createDatabaseDocumentSummaryStep = async ({
   documentId: string;
   summary: string;
 }) => {
-  DBOS.logger.info("Storing summary to database...");
+  DBOS.logger.info("Storing document summary to database...");
   await DocumentRepository.createDocumentSummary({ documentId, summary });
 };
 
