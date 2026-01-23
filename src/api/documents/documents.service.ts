@@ -51,7 +51,7 @@ const DocumentService = {
     }
 
     if (document.userId !== userId) {
-      DocumentService.validateSharedDocument(id, userId);
+      await DocumentService.validateSharedDocument(id, userId);
     }
     return document;
   },
